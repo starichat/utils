@@ -2,20 +2,19 @@ package main
 
 import (
 	"context"
-	"google.golang.org/grpc/balancer"
-	"google.golang.org/grpc/balancer/base"
-	hello "utils/grpc/proto"
-	uB "utils/grpc/balancer"
 	"fmt"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/balancer"
+	uB "utils/grpc/balancer"
+	hello "utils/grpc/proto"
 )
 
 func main() {
 	//注入自定义负载均衡组件
 	//resolver.SetDefaultScheme("dns")
 	// 连接服务器
-	balancer.Register(base.NewBalancerBuilder("color", uB.MyBalancerBuild{}, base.Config{HealthCheck: false}))
-	conn, err := grpc.Dial(":10010", grpc.WithInsecure())
+	balancer.Register(&uB.MyBalancerBuild{})
+	conn, err := grpc.Dial(":10010", grpc. WithDefaultServiceConfig(`{"loadBalancingPolicy":"color"}`))
 	//conn, err := grpc.DialContext(context.Background(),"",grpc.WithInsecure())
 	if err != nil {
 		fmt.Printf("faild to connect: %v", err)
