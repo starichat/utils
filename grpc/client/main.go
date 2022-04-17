@@ -22,6 +22,7 @@ func main() {
 	}
 	defer conn.Close()
 	//todo, 抓包建立连接
+	//conn 使用连接池来构建
 
 	c := hello.NewGreeterClient(conn)
 

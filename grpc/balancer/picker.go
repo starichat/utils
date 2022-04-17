@@ -69,9 +69,9 @@ func (p *MyPicker) buildDoneFunc(c *subConn) func(info balancer.DoneInfo) {
 }
 
 func (s subConn) UpdateAddresses(addresses []resolver.Address) {
-	panic("implement me")
+
 }
 
 func (s subConn) Connect() {
-	panic("implement me")
+
 }

@@ -3,7 +3,6 @@ package balancer
 import (
 	"fmt"
 	"google.golang.org/grpc/balancer"
-	"time"
 )
 
 /**
@@ -67,6 +66,6 @@ func (mp *MyBalancer) UpdateSubConnState(conn balancer.SubConn, state balancer.S
 
 func (mp *MyBalancer) Close() {
 	//优雅地关闭负载均衡连接器，需要释放所有的连接
-	time.Now().UTC().Unix()
+
 }
 
