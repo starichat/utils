@@ -1,6 +1,7 @@
 package pool
 
 import (
+	"container/ring"
 	"context"
 	"errors"
 	"google.golang.org/grpc"
@@ -33,8 +34,8 @@ type Pool struct {
 	closed bool          // set to true when the pool is closed.
 	active int           // the number of open connections in the pool
 	ch     chan struct{} // limits open connections when p.Wait is true
-	idle   []Conn     // idle connections
-
+	conns  *ring.Ring     // idle connections
+	idle *ring.Ring //idle 指向同一个环，只是索引位置不同
 
 }
 

@@ -2,11 +2,12 @@ package main
 
 import (
 	"context"
-	hello "utils/grpc/proto"
 	"fmt"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 	"net"
+	"time"
+	hello "utils/grpc/proto"
 )
 
 type HelloServer struct {
@@ -14,6 +15,8 @@ type HelloServer struct {
 }
 
 func (s *HelloServer) SayHello(ctx context.Context, in *hello.HelloRequest) (*hello.HelloReply, error) {
+	fmt.Println("get ",in.GetName())
+	time.Sleep(1*time.Second)
 	return &hello.HelloReply{Message: "Hello again " + in.GetName()}, nil
 }
 
