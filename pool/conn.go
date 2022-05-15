@@ -2,17 +2,18 @@ package pool
 
 import (
 	"context"
-	"errors"
 	"google.golang.org/grpc"
 	"sync"
+	"sync/atomic"
 )
 
 //ConnState 连接状态分为
 type ConnState int
 
 const (
-	Idle       ConnState = iota + 1 //空闲）
+	Idle       ConnState = iota + 1 //空闲
 	Running                         //运行，正在使用
+	Busying                         //忙碌，暂不可用
 )
 
 //Conn 一个连接大概有如下功能：
@@ -22,13 +23,21 @@ type Conn interface {
 	Value() *grpc.ClientConn //对应的类型需要用interface{}来断言
 	Close() error//关闭连接
 	UpdateState(targetState ConnState) error //连接的状态变更
-	Release()  //释放连接
+	Release() ConnState //释放连接
+	AddConnStream() ConnState //增加连接
+	Status() ConnState //当前连接状态
 }
 
 type GrpcConnWrap struct {
 	*grpc.ClientConn //集成grpc连接
 	State ConnState
 	mu sync.Mutex
+	ConnStreamCount int64 //当前连接数量
+	maxSize int64
+}
+
+func (c *GrpcConnWrap) Status() ConnState {
+	return c.State
 }
 
 
@@ -40,13 +49,8 @@ func DialGrpcConn(addr string) (*GrpcConnWrap, error) {
 		return nil, err
 	}
 	return &GrpcConnWrap{ClientConn:cc,State: Idle,mu:sync.Mutex{},
-	}, nil
+	maxSize: 10000}, nil
 }
-
-
-
-
-
 
 
 
@@ -56,6 +60,7 @@ func (c *GrpcConnWrap) Close() error {
 }
 
 
+
 //UpdateState 更新连接状态,连接更新操作需要加锁
 //ready -> idle
 //idle -> ready
@@ -63,27 +68,31 @@ func (c *GrpcConnWrap) Close() error {
 func (c *GrpcConnWrap)	UpdateState(targetState ConnState) error {//连接的状态变更
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if c.State == targetState {
-		//nothing to do
-		return ConnStateNotUpdate
-	} else if c.State == Idle && targetState == Running {
-		c.State = Running
+	if c.ConnStreamCount < c.maxSize {
 
-	} else if c.State == Running && targetState == Idle {
-		c.State = Idle
-	} else {
-		return errors.New("state err")
 	}
+
 	return nil
 }
 
-func (c *GrpcConnWrap) Release() {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.State = Idle
+func (c *GrpcConnWrap) Release() ConnState {
+	atomic.AddInt64(&c.ConnStreamCount,-1)
+	c.State = Running
+
+	return c.State
 }
 
 func (c *GrpcConnWrap) Value() *grpc.ClientConn {
 	return c.ClientConn
 }
 
+func (c *GrpcConnWrap) AddConnStream() ConnState {
+
+	atomic.AddInt64(&c.ConnStreamCount,1)
+	if c.ConnStreamCount < c.maxSize {
+		c.State = Running
+	} else {
+		c.State = Busying
+	}
+	return c.State
+}

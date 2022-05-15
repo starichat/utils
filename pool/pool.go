@@ -1,118 +1,114 @@
 package pool
-//
-//import (
-//	"container/ring"
-//	"context"
-//	"errors"
-//	"google.golang.org/grpc"
-//	"log"
-//	"sync"
-//	"time"
-//	"container/list"
-//)
-//
-///**
-//
-//*/
-//
-//
-//type PoolInterface interface {
-//	Get() (Conn, error)
-//	Close() error
-//	Put(c Conn) error
-//}
-//
-//
-//type Pool struct {
-//	MaxIdle int //最大空闲连接
-//	MaxActive int //最大活跃连接
-//	MaxCurrentStream int //最大并发stream数量，即单连接下的最大请求数量
-//	mu     sync.Mutex    // mu protects the following fields
-//	closed bool          // set to true when the pool is closed.
-//	active int           // the number of open connections in the pool
-//	ch     chan struct{} // limits open connections when p.Wait is true
-//	conns     *ring.Ring  //connections
-//	current int
-//}
-//
-//type Option func(p *Pool)
-//
-//var DefaultPool = &Pool{
-//	MaxIdle:         64,
-//	MaxActive:       64,
-//	MaxCurrentStream: 100,
-//	mu:              sync.Mutex{},
-//	closed:          false,
-//	active:          0,
-//	ch:              make(chan struct{}),
-//	conns: ring.New(64),
-//	current: 0,
-//}
-//
-//
-//func Dial(address string) (*grpc.ClientConn, error) {
-//	ctx, cancel := context.WithTimeout(context.Background(), 120 * time.Second)
-//	defer cancel()
-//	return grpc.DialContext(ctx, address, grpc.WithInsecure())
-//}
-//
-////New...
-//func New(address string, options ...Option) (*Pool, error) {
-//	if address == "" {
-//		panic("invalid address")
-//	}
-//
-//	//构建很多个连接
-//	pool := DefaultPool
-//	//基于选项模式更新pool结构
-//	for _, o := range options {
-//		//todo, 选型配置函数待优化
-//		o(pool)
-//	}
-//	//初始化连接
-//	for i:=0;i<pool.MaxIdle;i++{
-//		cc, err := DialGrpcConn(address, 120 * time.Second)
-//		if err !=nil {
-//			log.Println("err", err)
-//			continue
-//		}
-//
-//		err = pool.Put(cc)
-//		if err != nil {
-//			log.Println("err", err)
-//			continue
-//		}
-//	}
-//	return pool, nil
-//}
-//
-//
-//func (p *Pool) Get() (Conn, error) {
-//	if p.closed {
-//		return nil, errors.New("conn cloesd")
-//	}
-//	p.mu.Lock()
-//	defer p.mu.Unlock()
-//	//控制超时.120s内未获取到连接，则返回错误
-//	//随机取出当前连接的并发连接数，如果连接还能处理，则随机取出第一个连接，否则取其他空闲连接
-//
-//}
-//
-//// Close releases the resources used by the pool.
-//func (p *Pool) Close() error {
-//	p.closed = true
-//	//todo, 释放相关资源
-//	return nil
-//}
-//
-//func (p *Pool) Put(c Conn) error {
-//	p.mu.Lock()
-//	p.mu.Unlock()
-//	p.conns.Do()
-//	return nil
-//}
-//
-//
-//
-//
-//
+
+import (
+	"container/list"
+	"errors"
+	"fmt"
+	"log"
+	"sync"
+)
+
+type Pool interface {
+	Get() (Conn, error) //获取连接
+	Put(i Conn) error //放置连接
+	Remove(i Conn) error //移除连接
+	Close()  //关闭连接池
+}
+
+/**
+如果当前连接busy，则将其移到尾部
+*/
+
+func (p *listPool)Get() (Conn, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	//从空闲池中获取数据
+	if p.idleConns != nil  {
+		for item := p.idleConns.Front();item != nil;item = item.Next(){
+			if cc := item.Value.(Conn); cc.Status() == Running || cc.Status() == Idle {
+				state := cc.AddConnStream()
+				if state == Busying {
+					p.idleConns.MoveToBack(item)
+				}
+				return cc, nil
+			}
+			fmt.Println(errors.New("busying"))
+			continue
+
+		}
+	}
+	return nil, errors.New("no conn")
+
+}
+
+func (p *listPool) Put(i Conn) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.idleConns != nil {
+		if _, ok := p.conns[i];ok{
+			//该连接已经存在了，直接return
+			return errors.New("conn already exist")
+		}
+		fmt.Println("put a conn")
+		el := p.idleConns.PushFront(i)
+		p.conns[i] = el
+		return nil
+	}
+	return errors.New("no pool")
+}
+
+func (p *listPool) Close() {
+	fmt.Println("close todo ")
+}
+
+func (p *listPool) Remove(i Conn) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if i != nil {
+		p.idleConns.Remove(p.conns[i])
+		delete(p.conns, i)
+	}
+	return nil
+}
+
+func (p *listPool) AutoResize() error {
+	//空闲比率小于一定阈值
+	if float32(p.idleConns.Len()) / float32(len(p.conns)) < 0.9 {
+		//todo 缩容
+	}
+	return nil
+}
+
+
+
+type listPool struct {
+	mu *sync.Mutex
+	idleConns *list.List
+	conns map[Conn]*list.Element
+	maxCurrentConn int
+}
+
+func InitPool(size int) Pool {
+	p := &listPool{
+		mu: &sync.Mutex{},
+		idleConns: list.New(),
+		conns:     make(map[Conn]*list.Element,0),
+	}
+	//初始化连接
+	for i:=0;i<size;i++{
+		wc, err := DialGrpcConn("192.168.3.3:10010")
+		if err != nil {
+			log.Println("err",err)
+			continue
+		}
+		err = p.Put(wc)
+		if err != nil {
+			panic(err)
+		}
+	}
+	return p
+}
+
+
+
+
