@@ -18,7 +18,7 @@ func init() {
 	}
 	db.Set("on duplicate key upadte values(updat_time)").CreateInBatches()
 
-}xw
+}
 
 
 

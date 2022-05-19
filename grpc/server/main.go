@@ -6,6 +6,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 	"net"
+	"sync/atomic"
 	"time"
 	hello "utils/grpc/proto"
 )
@@ -17,9 +18,12 @@ type HelloServer struct {
 func (s *HelloServer) SayHello(ctx context.Context, in *hello.HelloRequest) (*hello.HelloReply, error) {
 	fmt.Println("get ",in.GetName())
 	time.Sleep(1*time.Second)
+	atomic.AddInt64(&i,1)
+	fmt.Printf("第%d次请求\n",i)
 	return &hello.HelloReply{Message: "Hello again " + in.GetName()}, nil
 }
 
+var i int64
 
 func main() {
 	lis, err := net.Listen("tcp", ":10010")

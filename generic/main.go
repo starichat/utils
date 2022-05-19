@@ -18,6 +18,8 @@ import "fmt"
 //return b
 //}
 
+comparable
+
 
 type Obj[T Numerber] struct {}
 
