@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 package gorm
 
 /**
@@ -22,3 +23,19 @@ func init() {
 
 
 
+=======
+package main
+
+type Tree struct {
+	List []Item
+}
+
+type Item struct {
+	id string
+	role int //是否是父节点
+}
+
+func main() {
+
+}
+>>>>>>> 11fb87368dcbcb9ed92c7343b0887db5c89c7f29

@@ -1,15 +1,19 @@
 package pool
 
 import (
+<<<<<<< HEAD
 	"container/ring"
 	"context"
+=======
+	"container/list"
+>>>>>>> 11fb87368dcbcb9ed92c7343b0887db5c89c7f29
 	"errors"
-	"google.golang.org/grpc"
+	"fmt"
 	"log"
 	"sync"
-	"time"
 )
 
+<<<<<<< HEAD
 /**
 连接池，主要实现了如下功能：
 1. 连接的自动扩容和缩容算法
@@ -52,112 +56,107 @@ var DefaultPool = &Pool{
 	active:          0,
 	ch:              make(chan struct{}),
 	idle:            []Conn,
+=======
+type Pool interface {
+	Get() (Conn, error) //获取连接
+	Put(i Conn) error //放置连接
+	Remove(i Conn) error //移除连接
+	Close()  //关闭连接池
+>>>>>>> 11fb87368dcbcb9ed92c7343b0887db5c89c7f29
 }
 
+/**
+如果当前连接busy，则将其移到尾部
+*/
 
-func Dial(address string) (*grpc.ClientConn, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 120 * time.Second)
-	defer cancel()
-	return grpc.DialContext(ctx, address, grpc.WithInsecure())
-}
-
-//New,toodo 改造为options
-func New(address string, options Option...) (*Pool, error) {
-	if address == "" {
-		panic("invalid address")
-	}
-
-	//构建很多个连接
-	pool := DefaultPool
-	//基于选项模式更新pool结构
-	for _, o := range options {
-		o(pool)
-	}
-	//基于options初始化配置参数
-	for i:=0;i<pool.MaxActive;i++{
-		cc, err := DialGrpcConn(address)
-		if err !=nil {
-			log.Println("err", err)
+func (p *listPool)Get() (Conn, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	//从空闲池中获取数据
+	if p.idleConns != nil  {
+		for item := p.idleConns.Front();item != nil;item = item.Next(){
+			if cc := item.Value.(Conn); cc.Status() == Running || cc.Status() == Idle {
+				state := cc.AddConnStream()
+				if state == Busying {
+					p.idleConns.MoveToBack(item)
+				}
+				return cc, nil
+			}
+			fmt.Println(errors.New("busying"))
 			continue
-		}
 
-		err = pool.Put(cc)
+		}
+	}
+	return nil, errors.New("no conn")
+
+}
+
+func (p *listPool) Put(i Conn) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.idleConns != nil {
+		if _, ok := p.conns[i];ok{
+			//该连接已经存在了，直接return
+			return errors.New("conn already exist")
+		}
+		fmt.Println("put a conn")
+		el := p.idleConns.PushFront(i)
+		p.conns[i] = el
+		return nil
+	}
+	return errors.New("no pool")
+}
+
+func (p *listPool) Close() {
+	fmt.Println("close todo ")
+}
+
+func (p *listPool) Remove(i Conn) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if i != nil {
+		p.idleConns.Remove(p.conns[i])
+		delete(p.conns, i)
+	}
+	return nil
+}
+
+func (p *listPool) AutoResize() error {
+	//空闲比率小于一定阈值
+	if float32(p.idleConns.Len()) / float32(len(p.conns)) < 0.9 {
+		//todo 缩容
+	}
+	return nil
+}
+
+
+
+type listPool struct {
+	mu *sync.Mutex
+	idleConns *list.List
+	conns map[Conn]*list.Element
+	maxCurrentConn int
+}
+
+func InitPool(size int) Pool {
+	p := &listPool{
+		mu: &sync.Mutex{},
+		idleConns: list.New(),
+		conns:     make(map[Conn]*list.Element,0),
+	}
+	//初始化连接
+	for i:=0;i<size;i++{
+		wc, err := DialGrpcConn("192.168.3.3:10010")
 		if err != nil {
-			log.Println("err", err)
+			log.Println("err",err)
 			continue
 		}
+		err = p.Put(wc)
+		if err != nil {
+			panic(err)
+		}
 	}
-	return pool, nil
-}
-
-
-func (p *Pool) Get() (Conn, error) {
-	if p.closed {
-		return nil, errors.New("conn cloesd")
-	}
-	if p.Wait  {
-		return nil, errors.New("conn busying")
-	}
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	if  > 0 {
-		cc :=<- p.idle
-		return cc, nil
-	}
-	return nil, errors.New("conn busying")
-}
-
-// Close releases the resources used by the pool.
-func (p *Pool) Close() error {
-	return nil
-}
-
-func (p *Pool) Put(c Conn) error {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	p.idle <- c
-	return nil
-}
-
-
-
-
-// PoolStats contains pool statistics.
-type PoolStats struct {
-	// ActiveCount is the number of connections in the pool. The count includes
-	// idle connections and connections in use.
-	ActiveCount int
-	// IdleCount is the number of idle connections in the pool.
-	IdleCount int
-}
-
-// Stats returns pool's statistics.
-func (p *Pool) Stats() PoolStats {
-	p.mu.Lock()
-	stats := PoolStats{
-		ActiveCount: p.active,
-		IdleCount:   len(p.idle),
-	}
-	p.mu.Unlock()
-
-	return stats
-}
-
-// ActiveCount returns the number of connections in the pool. The count
-// includes idle connections and connections in use.
-func (p *Pool) ActiveCount() int {
-	p.mu.Lock()
-	active := p.active
-	p.mu.Unlock()
-	return active
-}
-
-// IdleCount returns the number of idle connections in the pool.
-func (p *Pool) IdleCount() int {
-	p.mu.Lock()
-	idle := len(p.idle)
-	p.mu.Unlock()
-	return idle
+	return p
 }
 
 
