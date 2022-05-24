@@ -1,5 +1,0 @@
-CD C:\Users\Acer\Desktop\  #进入脚本的目录下
-start test.bat    #启动某个脚本
-
-CD
-start test
