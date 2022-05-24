@@ -35,7 +35,6 @@ func (c *GrpcConnWrap) Status() ConnState {
 	default:
 		return Avaliable
 	}
-	return c.State
 }
 
 //DialGrpcConn 新建一个grpc连接

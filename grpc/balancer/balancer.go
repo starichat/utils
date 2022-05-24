@@ -2,6 +2,7 @@ package balancer
 
 import (
 	"fmt"
+
 	"google.golang.org/grpc/balancer"
 )
 
@@ -26,9 +27,7 @@ type jsonSC struct {
 ```
 然后在resolver 拉起balancer组件就可以通过
 switch(balancer)来处理了
- */
-
-
+*/
 
 type MyBalancer struct {
 	cc balancer.ClientConn
@@ -68,4 +67,3 @@ func (mp *MyBalancer) Close() {
 	//优雅地关闭负载均衡连接器，需要释放所有的连接
 
 }
-

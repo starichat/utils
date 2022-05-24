@@ -3,18 +3,15 @@ package main
 import (
 	"context"
 	"fmt"
-	"google.golang.org/grpc"
 	"sync"
 	"time"
 	hello "utils/grpc/proto"
+
+	"google.golang.org/grpc"
 )
 
 func main() {
-	for {
-		if time.Now().Minute() == 18 {
-			break
-		}
-	}
+
 	fmt.Println("start")
 	//注入自定义负载均衡组件
 	t := time.Now().Unix()
@@ -22,7 +19,7 @@ func main() {
 	// 连接服务器
 	//balancer.Register(&uB.MyBalancerBuild{})
 	//conn, err := grpc.Dial(":10010", grpc. WithDefaultServiceConfig(`{"loadBalancingPolicy":"color"}`))
-	conn, err := grpc.DialContext(context.Background(),"192.168.3.3:10010",grpc.WithInsecure())
+	conn, err := grpc.DialContext(context.Background(), "10.20.43.34:10010", grpc.WithInsecure())
 	if err != nil {
 		fmt.Printf("faild to connect: %v", err)
 		return
@@ -33,7 +30,7 @@ func main() {
 	//conn 使用连接池来构建
 	wg := sync.WaitGroup{}
 	wg.Add(50000)
-	for i:=0;i<50000;i++{
+	for i := 0; i < 50000; i++ {
 		go func() {
 			t := time.Now().UnixMilli()
 			_, err := c.SayHello(context.Background(), &hello.HelloRequest{Name: "astar"})
@@ -46,7 +43,7 @@ func main() {
 
 	}
 	wg.Wait()
-	fmt.Println("耗时",time.Now().Unix()-t)
+	fmt.Println("耗时", time.Now().Unix()-t)
 	//
 	//// 调用服务端的SayHello
 	//
