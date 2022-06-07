@@ -28,7 +28,7 @@ type Task struct {
 }
 
 var (
-	dgraph = flag.String("d", "127.0.0.1:9080", "Dgraph server address")
+	dgraph = flag.String("d", "https://play.dgraph.io", "Dgraph server address")
 )
 
 func main() {
@@ -37,17 +37,21 @@ func main() {
 		panic(err)
 	}
 	//创建scheme
-	//err := CreateSchema(dg)
-	//err = AddSomeData(dg)
-	//if err != nil {
-	//	panic(err)
-	//}
-	err := QueryData(dg)
+	err := CreateSchema(dg)
+	err = AddSomeData(dg)
+	if err != nil {
+		panic(err)
+	}
+	err = QueryData(dg)
 	if err != nil {
 		panic(err)
 	}
 	fmt.Println(1111111111)
 	err = QueryDataID(dg)
+	if err != nil {
+		panic(err)
+	}
+	err = QueryReverseID(dg)
 	if err != nil {
 		panic(err)
 	}
@@ -72,12 +76,14 @@ func CreateSchema(client *dgo.Dgraph) error {
   Desc: string .
   Status: int .
   WorkFlowID: string @index(term) .
-  
+  PreTasks: [uid] @reverse .
+
   type Task {
     ID           
 	Desc         
 	Status
-	   
+	WorkFlowID
+ 	<~PreTasks>
   }
   `
 	op := &api.Operation{Schema: schema}
@@ -144,12 +150,15 @@ func AddSomeData(client *dgo.Dgraph) error {
 		WorkFlowID:   "workflow-1",
 	}
 	//建立t4任务的依赖
-	t4.PreTasks = append(t4.PreTasks, t1, t2, t3)
+	t4.PreTasks = append(t4.PreTasks, t1, t2)
 	t5.PreTasks = append(t5.PreTasks, t4)
-	t6.PreTasks = append(t6.PreTasks, t4)
+	t6.PreTasks = append(t6.PreTasks, t3,t4)
 	t7.PreTasks = append(t7.PreTasks, t5, t6)
 	//结束标识
 	tlast.PreTasks = append(tlast.PreTasks, t7)
+
+	//下一个任务的建立
+
 	mu := &api.Mutation{CommitNow: true}
 	pb, err := json.Marshal(tlast)
 	if err != nil {
@@ -211,7 +220,33 @@ func QueryDataID(client *dgo.Dgraph) error {
     }
     `
 	txn := client.NewTxn()
-	res, err := txn.QueryWithVars(context.Background(), q, map[string]string{"$ID": "task-5"})
+	res, err := txn.QueryWithVars(context.Background(), q, map[string]string{"$ID": "task-1"})
+	if err != nil {
+		return err
+	}
+	//判断依赖任务是否都完成了
+
+	fmt.Println(res.String())
+	return nil
+}
+
+
+func QueryReverseID(client *dgo.Dgraph) error {
+
+	q := `
+ query q($ID: string){
+     q(func:eq($ID, ID)){
+        ~PreTasks {
+                ID          
+	   			Desc        
+	   			Status
+				WorkFlowID
+            }
+        }
+    }
+    `
+	txn := client.NewTxn()
+	res, err := txn.QueryWithVars(context.Background(), q, map[string]string{"$ID": "task-4"})
 	if err != nil {
 		return err
 	}
