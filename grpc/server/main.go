@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net"
 	"sync/atomic"
-	"time"
+	
 	hello "utils/grpc/proto"
 
 	"google.golang.org/grpc"
@@ -17,7 +17,7 @@ type HelloServer struct {
 
 func (s *HelloServer) SayHello(ctx context.Context, in *hello.HelloRequest) (*hello.HelloReply, error) {
 	fmt.Println("get ", in.GetName())
-	time.Sleep(1 * time.Second)
+	//time.Sleep(5 * time.Second)
 	atomic.AddInt64(&i, 1)
 	fmt.Printf("第%d次请求\n", i)
 	return &hello.HelloReply{Message: "Hello again " + in.GetName()}, nil
@@ -26,7 +26,7 @@ func (s *HelloServer) SayHello(ctx context.Context, in *hello.HelloRequest) (*he
 var i int64
 
 func main() {
-	lis, err := net.Listen("tcp", "192.168.3.9:10010")
+	lis, err := net.Listen("tcp", ":10010")
 	if err != nil {
 		fmt.Printf("failed to listen: %v", err)
 		return

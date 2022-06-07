@@ -3,6 +3,7 @@ module utils
 go 1.16
 
 require (
+	github.com/dgraph-io/dgo/v2 v2.2.0
 	github.com/gin-contrib/sessions v0.0.5
 	github.com/gin-gonic/gin v1.7.7
 	github.com/golang/protobuf v1.4.1
@@ -10,8 +11,6 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/securecookie v1.1.1
 	github.com/gorilla/sessions v1.2.1
-	golang.org/x/net v0.0.0-20200822124328-c89045814202 // indirect
-	google.golang.org/genproto v0.0.0-20200526211855-cb27e3aa2013 // indirect
 	google.golang.org/grpc v1.27.0
-	google.golang.org/protobuf v1.23.1-0.20200526195155-81db48ad09cc
+	google.golang.org/protobuf v1.25.0
 )

@@ -1,5 +1,9 @@
 # github.com/boj/redistore v0.0.0-20180917114910-cd5dcc76aeff
 github.com/boj/redistore
+# github.com/dgraph-io/dgo/v2 v2.2.0
+## explicit
+github.com/dgraph-io/dgo/v2
+github.com/dgraph-io/dgo/v2/protos/api
 # github.com/gin-contrib/sessions v0.0.5
 ## explicit
 github.com/gin-contrib/sessions
@@ -53,12 +57,13 @@ github.com/mattn/go-isatty
 github.com/modern-go/concurrent
 # github.com/modern-go/reflect2 v0.0.0-20180701023420-4b7aa43c6742
 github.com/modern-go/reflect2
+# github.com/pkg/errors v0.9.1
+github.com/pkg/errors
 # github.com/ugorji/go/codec v1.1.7
 github.com/ugorji/go/codec
 # golang.org/x/crypto v0.0.0-20210220033148-5ea612d1eb83
 golang.org/x/crypto/sha3
-# golang.org/x/net v0.0.0-20200822124328-c89045814202
-## explicit
+# golang.org/x/net v0.0.0-20190813141303-74dc4d7220e7
 golang.org/x/net/http/httpguts
 golang.org/x/net/http2
 golang.org/x/net/http2/hpack
@@ -75,7 +80,6 @@ golang.org/x/text/transform
 golang.org/x/text/unicode/bidi
 golang.org/x/text/unicode/norm
 # google.golang.org/genproto v0.0.0-20200526211855-cb27e3aa2013
-## explicit
 google.golang.org/genproto/googleapis/rpc/status
 # google.golang.org/grpc v1.27.0
 ## explicit
@@ -117,7 +121,7 @@ google.golang.org/grpc/serviceconfig
 google.golang.org/grpc/stats
 google.golang.org/grpc/status
 google.golang.org/grpc/tap
-# google.golang.org/protobuf v1.23.1-0.20200526195155-81db48ad09cc
+# google.golang.org/protobuf v1.25.0
 ## explicit
 google.golang.org/protobuf/encoding/prototext
 google.golang.org/protobuf/encoding/protowire
@@ -129,12 +133,11 @@ google.golang.org/protobuf/internal/encoding/messageset
 google.golang.org/protobuf/internal/encoding/tag
 google.golang.org/protobuf/internal/encoding/text
 google.golang.org/protobuf/internal/errors
-google.golang.org/protobuf/internal/fieldnum
 google.golang.org/protobuf/internal/fieldsort
 google.golang.org/protobuf/internal/filedesc
 google.golang.org/protobuf/internal/filetype
 google.golang.org/protobuf/internal/flags
-google.golang.org/protobuf/internal/genname
+google.golang.org/protobuf/internal/genid
 google.golang.org/protobuf/internal/impl
 google.golang.org/protobuf/internal/mapsort
 google.golang.org/protobuf/internal/pragma
