@@ -123,5 +123,4 @@ func (h *ConsistentHash) Get(key string) (Node, bool) {
 	node := h.ring[h.keys[index]]
 	_, ok := h.nodes[node]
 	return node, ok
-
 }
