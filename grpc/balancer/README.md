@@ -108,3 +108,10 @@ type V2Picker interface {
 
 4. 最后通过Pick获取连接并执行 【 call -> pick -> sendMsg -> recvMsg】 grpc 实际性调用
 
+
+
+newCCWrapBalancerBuilder
+
+applyServiceConfigAndBalancer(sc, addrs) -> balancerBuilder -> newCCBalancerWrapper -> Build -> Balancer 
+
+call -> pick

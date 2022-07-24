@@ -61,6 +61,15 @@ func NewConsistentHash(size int, hash Func) *ConsistentHash {
 	}
 }
 
+func NewConsistentHashWithAddrs(addrs []string, size int, hash Func) *ConsistentHash {
+	ch := NewConsistentHash(size, hash)
+	for _, v := range addrs {
+		ch.Add(Node(v))
+	}
+	return ch
+
+}
+
 //Add ...
 func (h *ConsistentHash) Add(node Node) {
 	h.Lock()
