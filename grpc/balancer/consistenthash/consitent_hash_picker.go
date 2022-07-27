@@ -45,20 +45,25 @@ type V2Picker interface {
 type Picker struct {
 	consistentHash *ConsistentHash
 	subConns       map[string]balancer.SubConn //string -> addr
+	cc             balancer.ClientConn
 }
 
+// Pick: pick a subConn
 func (p *Picker) Pick(info balancer.PickInfo) (balancer.PickResult, error) {
-	//从info中生成hashkey
+	//根据请求对应的hashkey，映射到指定的服务端node上去
 	node, b := p.consistentHash.Get(GenerateKey(info))
+	//  如果服务端node，不存在，则证明没有可用连接可提供
 	if !b {
 		return balancer.PickResult{}, errors.New("no node")
 	}
+	// 然后通过对应的node缓存的连接，选取出其中一条可用的来，如果没有可用连接，则新建一条
 	if v, ok := p.subConns[string(node)]; ok {
 		return balancer.PickResult{
 			SubConn: v,
 			Done:    nil,
 		}, nil
 	}
+	//todo ,新建连接或者报告该连接出错
 	return balancer.PickResult{}, errors.New("not found")
 }
 

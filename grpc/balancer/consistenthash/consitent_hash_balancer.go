@@ -6,21 +6,11 @@ import (
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/resolver"
 	"log"
-	"sync"
 )
 
+//BalancerBuilder 负载均衡组件
 type BalancerBuilder struct {
-	sync.RWMutex
-	hashFunc        Func
-	keys            slots                       //虚拟节点列表，排序好的虚拟节点，便于通过二分算法快速定位到最近的物理节点
-	ring            map[uint64]balancer.SubConn //虚拟节点到物理节点的映射
-	nodes           map[Node]struct{}           //物理节点映射，判断当前物理节点是否存在
-	NumVirtualNodes int                         // 为每台机器在hash圆环上创建多少个虚拟Node
 }
-
-const (
-	ConsistentHashBalancer = "ConsistentHashBalancer"
-)
 
 func init() {
 	balancer.Register(newBalancerBuilder())
@@ -36,7 +26,6 @@ func (c *BalancerBuilder) Build(cc balancer.ClientConn, opts balancer.BuildOptio
 	//构建一个Balancer接口对象
 	b := &consistentHashBalancer{
 		cc:        cc,
-		csEvltr:   nil,
 		state:     connectivity.Ready,
 		addrInfos: make(map[string]resolver.Address),
 		subConns:  make(map[string]balancer.SubConn),
@@ -47,40 +36,41 @@ func (c *BalancerBuilder) Build(cc balancer.ClientConn, opts balancer.BuildOptio
 }
 
 func (c *BalancerBuilder) Name() string {
-	return ConsistentHashBalancer
+	return "ConsistentHashBalancer"
 }
 
 //实现Balancer接口
 
 type consistentHashBalancer struct {
-	cc balancer.ClientConn
+	cc balancer.ClientConn //ClientConn
 
-	csEvltr   *balancer.ConnectivityStateEvaluator
-	state     connectivity.State
-	addrInfos map[string]resolver.Address
-	subConns  map[string]balancer.SubConn
+	state     connectivity.State          //连接状态
+	addrInfos map[string]resolver.Address //保存resolver解析得到的地址列表
+	subConns  map[string]balancer.SubConn //服务端和可用子连接的映射，这里用服务端地址作为key，同时该key也是一致性哈希里的物理node，每个服务端地址维护一份可用连接
 
-	scStates map[balancer.SubConn]connectivity.State
-	picker   balancer.Picker
+	scStates map[balancer.SubConn]connectivity.State //维护子连接及其状态
+	picker   balancer.Picker                         //缓存一份picker对象
 
 	resolverErr error
 	connErr     error
 }
 
+//Close ...
 func (c *consistentHashBalancer) Close() {
 }
 
+//UpdateClientConnState 当 clientConn 状态变更时会被调用，state 为变更的状态
 func (c *consistentHashBalancer) UpdateClientConnState(state balancer.ClientConnState) error {
-	//定义地址集合
-	addrsSet := make(map[string]struct{})
-	//遍历ClientConnState的所有地址
+	//定义一个地址集合
+	addrs := make(map[string]struct{})
+	//遍历ClientConnState中 resolver 提供的最新的所有地址
 	for _, a := range state.ResolverState.Addresses {
 		addr := a.Addr
 		//将地址更新到consistentHashBalancer的地址列表中
 		c.addrInfos[addr] = a
-		addrsSet[addr] = struct{}{}
+		addrs[addr] = struct{}{}
 		if sc, ok := c.subConns[addr]; !ok {
-			//没有获取到子连接，建立新连接
+			//没有获取到子连接，则基于当前服务端地址，建立一个新连接
 			newSC, err := c.cc.NewSubConn([]resolver.Address{a}, balancer.NewSubConnOptions{})
 			if err != nil {
 				log.Printf("Consistent Hash Balancer: failed to create new SubConn: %v", err)
@@ -90,13 +80,13 @@ func (c *consistentHashBalancer) UpdateClientConnState(state balancer.ClientConn
 			c.subConns[addr] = newSC
 
 		} else {
-			//取到了连接，尝试更新当前子连接，没有没问题，则会直接返回，否则仍然会出发一系列连接状态更新的操作
+			//取到了连接，尝试更新当前子连接，没有没问题，则会直接返回，否则，会尝试保证当前连接的可靠性，诸如，重新建立连接之类的
 			c.cc.UpdateAddresses(sc, []resolver.Address{a})
 		}
 	}
 	//清理废弃的addr对应的子连接
 	for a, sc := range c.subConns {
-		if _, ok := addrsSet[a]; !ok {
+		if _, ok := addrs[a]; !ok {
 			c.cc.RemoveSubConn(sc)
 			delete(c.subConns, a)
 		}
@@ -105,14 +95,18 @@ func (c *consistentHashBalancer) UpdateClientConnState(state balancer.ClientConn
 		c.ResolverError(fmt.Errorf("可用地址为空"))
 		return balancer.ErrBadResolverState
 	}
+	//picker 为空，则建立一个新的picker
 	if c.picker == nil {
 		c.picker = NewConsistentHashPicker(c.subConns)
 	}
+	//todo， 判断连接状态
+	//这就是连接 balancer 和 picker 的重要过程，基于此函数，会更新ClientConn的连接状态，并且后续通过picker来pick出连接来
 	c.cc.UpdateState(balancer.State{ConnectivityState: c.state, Picker: c.picker})
 
 	return nil
 }
 
+// ResolverError 当reslover组件报告某些错误，可通过该函数回调
 func (c *consistentHashBalancer) ResolverError(err error) {
 	c.resolverErr = err
 
@@ -128,6 +122,7 @@ func (c *consistentHashBalancer) ResolverError(err error) {
 	})
 }
 
+// UpdateSubConnState 当子连接状态变更会回调该函数
 func (c *consistentHashBalancer) UpdateSubConnState(sc balancer.SubConn, state balancer.SubConnState) {
 	s := state.ConnectivityState
 
@@ -136,10 +131,10 @@ func (c *consistentHashBalancer) UpdateSubConnState(sc balancer.SubConn, state b
 
 	case connectivity.Shutdown:
 		//重新连接
+		sc.Connect()
 	case connectivity.TransientFailure:
 		//抛错
 	}
-	//todo 子连接状态变更应该如何处理？
 
 	c.cc.UpdateState(balancer.State{ConnectivityState: c.state, Picker: c.picker})
 }

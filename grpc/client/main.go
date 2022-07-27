@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
-	hello "utils/grpc/proto"
-
+	"github.com/google/uuid"
 	"google.golang.org/grpc"
+	_ "utils/grpc/balancer/consistenthash"
+	hello "utils/grpc/proto"
+	_ "utils/grpc/resolver"
 )
 
 func main() {
@@ -55,14 +57,21 @@ func main() {
 }
 
 func grpcCallWithConsistentBalancer() {
-	conn, err := grpc.Dial(":10010", grpc.WithDefaultServiceConfig(`{"loadBalancingPolicy":"ConsistentHashBalancer"}`))
+
+	conn, err := grpc.Dial("myResolver://grpc-server/grpc-server", grpc.WithDefaultServiceConfig(`{"loadBalancingPolicy":"ConsistentHashBalancer"}`), grpc.WithInsecure())
 	if err != nil {
 		fmt.Printf("faild to connect: %v", err)
 		return
 	}
 	c := hello.NewGreeterClient(conn)
-	_, err = c.SayHello(context.Background(), &hello.HelloRequest{Name: "astar"})
-	if err != nil {
-		fmt.Printf("could not greet: %v", err)
+
+	for _, _ = range []int{1, 2, 3} {
+		ctx := context.WithValue(context.Background(), "request_id", uuid.New().String())
+		r, err := c.SayHello(ctx, &hello.HelloRequest{Name: "astar"})
+		if err != nil {
+			fmt.Printf("could not greet: %v", err)
+		}
+		fmt.Println(r)
 	}
+
 }

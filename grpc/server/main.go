@@ -2,11 +2,9 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"net"
-	"sync"
-	"sync/atomic"
-
 	hello "utils/grpc/proto"
 
 	"google.golang.org/grpc"
@@ -16,24 +14,20 @@ import (
 type HelloServer struct {
 }
 
+var addr string
+
+func init() {
+	flag.StringVar(&addr, "a", addr, "")
+}
+
 func (s *HelloServer) SayHello(ctx context.Context, in *hello.HelloRequest) (*hello.HelloReply, error) {
-	fmt.Println("get ", in.GetName())
-	//time.Sleep(5 * time.Second)
-	atomic.AddInt64(&i, 1)
-	fmt.Printf("第%d次请求\n", i)
+	fmt.Printf("1111", in.Name)
 	return &hello.HelloReply{Message: "Hello again " + in.GetName()}, nil
 }
 
-var i int64
-
 func main() {
-	addrs := []string{":10000", ":10011", ":10012"}
-	wg := sync.WaitGroup{}
-	wg.Add(3)
-	for _, v := range addrs {
-		go startServer(v)
-	}
-	wg.Wait()
+	flag.Parse()
+	startServer(addr)
 
 }
 
