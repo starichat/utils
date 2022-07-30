@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"net"
+	"sync/atomic"
 	hello "utils/grpc/proto"
 
 	"google.golang.org/grpc"
@@ -20,8 +21,12 @@ func init() {
 	flag.StringVar(&addr, "a", addr, "")
 }
 
+var i int32
+
 func (s *HelloServer) SayHello(ctx context.Context, in *hello.HelloRequest) (*hello.HelloReply, error) {
-	fmt.Printf("1111", in.Name)
+	fmt.Println(in.Name)
+	i = atomic.AddInt32(&i, 1)
+	fmt.Printf("第 %d 次请求\n", i)
 	return &hello.HelloReply{Message: "Hello again " + in.GetName()}, nil
 }
 
